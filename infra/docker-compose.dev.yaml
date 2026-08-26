@@ -108,6 +108,22 @@ services:
       timeout: 5s
       retries: 10
 
+  # --- Observability ---
+  # Jaeger v2 (built on the OpenTelemetry Collector core) — receives OTLP
+  # traces directly, no config file needed for all-in-one mode. Every
+  # service points OTEL_EXPORTER_OTLP_ENDPOINT here (base URL — the OTLP
+  # exporter appends /v1/traces itself) and loads instrumentation via
+  # NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
+  # rather than an in-app import — see
+  # docs/architecture-decision-records/0004-otel-preload-not-import.md.
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    container_name: vsb-jaeger
+    ports:
+      - "16686:16686" # Jaeger UI: http://localhost:16686
+      - "4318:4318" # OTLP HTTP receiver
+    networks: [vsb-net]
+
   # --- Pilot services ---
   api-gateway:
     build:
@@ -120,11 +136,15 @@ services:
       PROMOTIONS_SERVICE_URL: http://promotions-service:3001
       ANALYTICS_SERVICE_URL: http://analytics-service:3003
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: api-gateway
+      NODE_OPTIONS: --require @opentelemetry/auto-instrumentations-node/register
     ports:
       - "3000:3000"
     depends_on:
       - promotions-service
       - analytics-service
+      - jaeger
     networks: [vsb-net]
 
   promotions-service:
@@ -137,6 +157,9 @@ services:
       PORT: 3001
       MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
       KAFKA_BROKERS: redpanda:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: promotions-service
+      NODE_OPTIONS: --require @opentelemetry/auto-instrumentations-node/register
     ports:
       - "3001:3001"
     depends_on:
@@ -144,6 +167,8 @@ services:
         condition: service_completed_successfully
       redpanda:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     networks: [vsb-net]
 
   notification-service:
@@ -156,6 +181,9 @@ services:
       PORT: 3002
       MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
       KAFKA_BROKERS: redpanda:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: notification-service
+      NODE_OPTIONS: --require @opentelemetry/auto-instrumentations-node/register
     ports:
       - "3002:3002"
     depends_on:
@@ -163,6 +191,8 @@ services:
         condition: service_completed_successfully
       redpanda:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     networks: [vsb-net]
 
   analytics-service:
@@ -175,6 +205,9 @@ services:
       PORT: 3003
       MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
       KAFKA_BROKERS: redpanda:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: analytics-service
+      NODE_OPTIONS: --require @opentelemetry/auto-instrumentations-node/register
     ports:
       - "3003:3003"
     depends_on:
@@ -182,4 +215,6 @@ services:
         condition: service_completed_successfully
       redpanda:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     networks: [vsb-net]

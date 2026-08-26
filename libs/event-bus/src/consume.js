@@ -1,3 +1,5 @@
+import { consumeWithTracing } from "./tracePropagation.js";
+
 // Standard eachMessage loop every consumer service wires up: parse the
 // envelope, hand it to the caller's handler, and let unhandled errors
 // propagate so kafkajs's own retry/backoff re-delivers the message (the
@@ -14,7 +16,11 @@ export async function runConsumer({ consumer, topics, handler, logger }) {
         return; // not retryable — malformed payload will never parse
       }
       try {
-        await handler(envelope, { topic, partition });
+        await consumeWithTracing({
+          topic,
+          headers: message.headers,
+          handler: () => handler(envelope, { topic, partition }),
+        });
       } catch (err) {
         logger.error({ err, topic, eventId: envelope.eventId }, "event handler failed, will be retried");
         throw err;

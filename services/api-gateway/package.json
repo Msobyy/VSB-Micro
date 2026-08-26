@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@vsb/config": "workspace:*",
+    "@opentelemetry/auto-instrumentations-node": "^0.79.0",
     "@vsb/http-errors": "workspace:*",
     "@vsb/logger": "workspace:*",
     "express": "^5.2.1",

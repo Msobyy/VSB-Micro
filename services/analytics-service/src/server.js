@@ -1,5 +1,10 @@
 // Entry point. Same boot ordering principle as the other two pilot
 // services: datastore first, then the Kafka consumer, then HTTP.
+// OTel auto-instrumentation is loaded via NODE_OPTIONS
+// (--require @opentelemetry/auto-instrumentations-node/register), not an
+// in-app import — see docs/architecture-decision-records/0004-otel-preload-not-import.md
+// for why an app-level "import tracing first" approach doesn't reliably
+// instrument kafkajs specifically.
 import mongoose from "mongoose";
 import { createLogger } from "@vsb/logger";
 import { createKafkaClient, createConsumer, runConsumer } from "@vsb/event-bus";

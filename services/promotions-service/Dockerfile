@@ -14,5 +14,11 @@ FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /repo
 COPY --from=deps /repo .
+# CWD must be the service's own directory, not /repo — NODE_OPTIONS's
+# --require @opentelemetry/auto-instrumentations-node/register (set via
+# docker-compose) resolves that bare specifier relative to CWD, and the
+# package only exists under this service's own node_modules, not hoisted
+# to the workspace root.
+WORKDIR /repo/services/promotions-service
 EXPOSE 3001
-CMD ["node", "services/promotions-service/src/server.js"]
+CMD ["node", "src/server.js"]

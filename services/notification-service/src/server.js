@@ -2,6 +2,11 @@
 // subscribing to Kafka, so the consumer never processes a message before
 // its dependencies are ready — same ordering principle as
 // promotions-service/src/server.js.
+// OTel auto-instrumentation is loaded via NODE_OPTIONS
+// (--require @opentelemetry/auto-instrumentations-node/register), not an
+// in-app import — see docs/architecture-decision-records/0004-otel-preload-not-import.md
+// for why an app-level "import tracing first" approach doesn't reliably
+// instrument kafkajs specifically.
 import mongoose from "mongoose";
 import { createLogger } from "@vsb/logger";
 import { createKafkaClient, createConsumer, runConsumer } from "@vsb/event-bus";

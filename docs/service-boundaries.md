@@ -41,6 +41,19 @@ Derived from `vsb-backend`'s and `vsb-crm-backend`'s existing `models/`,
   added later on a specific hot path without a rewrite, if REST proves to be
   a bottleneck. Nothing today needs that.
 
+## Observability
+
+Every service is traced end to end — HTTP/Express/Mongo via
+`@opentelemetry/auto-instrumentations-node` (loaded through `NODE_OPTIONS`,
+not an app-level import), and the Kafka producer/consumer boundary via
+manual spans in `@vsb/event-bus` (auto-instrumentation can't cover it here
+— see `docs/architecture-decision-records/0004-otel-preload-not-import.md`
+for why). A single request traces as one connected story across all
+services it touches, including through the outbox's async gap. Traces
+export to Jaeger locally (`infra/docker-compose.dev.yaml`); any service
+built on `@vsb/event-bus`'s helpers (`buildOutboxDocument`,
+`startOutboxRelay`, `runConsumer`) gets this for free.
+
 ## Realtime/Socket.IO (future — not built)
 
 A future `realtime-gateway` should stay intentionally "dumb": authenticate

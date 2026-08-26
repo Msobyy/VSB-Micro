@@ -2,7 +2,7 @@
 // matters for this pilot: atomically (a) claim a redemption slot on the
 // coupon and (b) queue the promotions.coupon.redeemed event via the outbox
 // — see @vsb/event-bus's outbox.js for why these have to be one transaction.
-import { withTransaction, getOutboxModel, buildEventEnvelope } from "@vsb/event-bus";
+import { withTransaction, getOutboxModel, buildOutboxDocument, buildEventEnvelope } from "@vsb/event-bus";
 import { couponRedeemedEventV1, COUPON_REDEEMED_TOPIC } from "@vsb/event-schemas";
 import { ApiError } from "@vsb/http-errors";
 import { getCouponModel } from "../models/couponModel.js";
@@ -70,15 +70,7 @@ export async function redeemCoupon(connection, { code, driverId, fareAmount }) {
     }
 
     await Outbox.create(
-      [
-        {
-          eventId: envelope.eventId,
-          topic: COUPON_REDEEMED_TOPIC,
-          partitionKey: driverId,
-          envelope,
-          status: "pending",
-        },
-      ],
+      [buildOutboxDocument({ eventId: envelope.eventId, topic: COUPON_REDEEMED_TOPIC, partitionKey: driverId, envelope })],
       { session },
     );
 

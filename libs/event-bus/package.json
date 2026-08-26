@@ -8,6 +8,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "kafkajs": "^2.2.4",
     "mongoose": "^9.9.4"
   },

@@ -10,16 +10,15 @@
 // Started once at boot by any service that owns an outbox (e.g.
 // promotions-service's server.js).
 import { getOutboxModel } from "./outbox.js";
+import { publishWithTracing } from "./tracePropagation.js";
 
 async function publishPending(outboxDoc, producer, logger) {
-  await producer.send({
+  await publishWithTracing({
+    producer,
     topic: outboxDoc.topic,
-    messages: [
-      {
-        key: outboxDoc.partitionKey,
-        value: JSON.stringify(outboxDoc.envelope),
-      },
-    ],
+    key: outboxDoc.partitionKey,
+    value: JSON.stringify(outboxDoc.envelope),
+    traceContext: outboxDoc.traceContext,
   });
   outboxDoc.status = "sent";
   outboxDoc.sentAt = new Date();

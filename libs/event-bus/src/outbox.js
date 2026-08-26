@@ -6,6 +6,7 @@
 // only thing that actually talks to Kafka. Used by producer-side services
 // (e.g. promotions-service's coupon redemption flow).
 import mongoose from "mongoose";
+import { captureTraceContext } from "./tracePropagation.js";
 
 const outboxSchema = new mongoose.Schema(
   {
@@ -15,12 +16,30 @@ const outboxSchema = new mongoose.Schema(
     envelope: { type: mongoose.Schema.Types.Mixed, required: true },
     status: { type: String, enum: ["pending", "sent"], default: "pending", index: true },
     sentAt: { type: Date },
+    // W3C traceparent (etc), captured at write time so the relay can resume
+    // the originating request's trace whenever it actually publishes —
+    // see tracePropagation.js's header comment.
+    traceContext: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true, collection: "outbox" },
 );
 
 export function getOutboxModel(connection) {
   return connection.models.Outbox ?? connection.model("Outbox", outboxSchema);
+}
+
+/** Builds an outbox row ready to `.create([...], { session })` — callers
+ * should never construct the plain object by hand, so traceContext capture
+ * isn't something every producer has to remember to do itself. */
+export function buildOutboxDocument({ eventId, topic, partitionKey, envelope }) {
+  return {
+    eventId,
+    topic,
+    partitionKey,
+    envelope,
+    status: "pending",
+    traceContext: captureTraceContext(),
+  };
 }
 
 /**

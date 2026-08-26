@@ -61,3 +61,10 @@ Then:
   (or a real FCM log line if `FIREBASE_*` env vars are set) entry.
 - `curl http://localhost:3000/api/v1/analytics/redemptions` → confirm the
   redemption shows up in the read model.
+- Open http://localhost:16686 (Jaeger UI) → pick `api-gateway` from the
+  service dropdown → Find Traces → the redemption should show as one
+  connected trace spanning all four services (the request through
+  `api-gateway`/`promotions-service`, then the async Kafka publish/process
+  spans in `notification-service` and `analytics-service`) — see
+  `docs/architecture-decision-records/0004-otel-preload-not-import.md` for
+  how the Kafka boundary specifically is traced.

@@ -21,6 +21,7 @@ docker compose -f infra/docker-compose.dev.yaml up --build
 
 - API gateway: http://localhost:3000
 - Redpanda Console (topic inspector): http://localhost:8080
+- Jaeger UI (distributed traces): http://localhost:16686
 
 There's no create-coupon endpoint in this pilot (redemption only — see
 `services/promotions-service/CLAUDE.md`), so seed one first:

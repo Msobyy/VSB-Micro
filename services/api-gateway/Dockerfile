@@ -12,5 +12,8 @@ FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /repo
 COPY --from=deps /repo .
+# CWD must be the service's own directory — see promotions-service's
+# Dockerfile comment for why (NODE_OPTIONS --require resolution).
+WORKDIR /repo/services/api-gateway
 EXPOSE 3000
-CMD ["node", "services/api-gateway/src/server.js"]
+CMD ["node", "src/server.js"]

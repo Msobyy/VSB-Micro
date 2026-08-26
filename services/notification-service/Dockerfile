@@ -12,5 +12,8 @@ FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /repo
 COPY --from=deps /repo .
+# CWD must be the service's own directory — see promotions-service's
+# Dockerfile comment for why (NODE_OPTIONS --require resolution).
+WORKDIR /repo/services/notification-service
 EXPOSE 3002
-CMD ["node", "services/notification-service/src/server.js"]
+CMD ["node", "src/server.js"]
