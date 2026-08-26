@@ -1,0 +1,28 @@
+{
+  "name": "@vsb/notification-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:all": "vitest run"
+  },
+  "dependencies": {
+    "@vsb/config": "workspace:*",
+    "@vsb/event-bus": "workspace:*",
+    "@vsb/event-schemas": "workspace:*",
+    "@vsb/http-errors": "workspace:*",
+    "@vsb/logger": "workspace:*",
+    "express": "^5.2.1",
+    "firebase-admin": "^14.3.0",
+    "mongoose": "^9.9.4"
+  },
+  "devDependencies": {
+    "@vsb/test-utils": "workspace:*",
+    "vitest": "^4.1.11"
+  }
+}

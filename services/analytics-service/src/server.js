@@ -1,0 +1,53 @@
+// Entry point. Same boot ordering principle as the other two pilot
+// services: datastore first, then the Kafka consumer, then HTTP.
+import mongoose from "mongoose";
+import { createLogger } from "@vsb/logger";
+import { createKafkaClient, createConsumer, runConsumer } from "@vsb/event-bus";
+import { TOPICS } from "@vsb/event-schemas";
+import { config } from "./config/index.js";
+import { createApp } from "./app.js";
+import { couponRedeemedConsumer } from "./events/consumers/couponRedeemedConsumer.js";
+
+const logger = createLogger(config.serviceName);
+
+async function main() {
+  const connection = mongoose.createConnection(config.mongoUri, { dbName: config.mongoDbName });
+  await connection.asPromise();
+  logger.info({ db: config.mongoDbName }, "mongo connected");
+
+  const kafka = createKafkaClient({ clientId: config.kafka.clientId, brokers: config.kafka.brokers });
+  const consumer = await createConsumer(kafka, config.kafkaGroupId);
+
+  const handler = couponRedeemedConsumer({ connection, logger });
+  const consumeLoop = runConsumer({
+    consumer,
+    topics: [TOPICS.PROMOTIONS_COUPON_REDEEMED],
+    handler,
+    logger,
+  });
+  consumeLoop.catch((err) => {
+    logger.error({ err }, "consumer loop crashed");
+    process.exit(1);
+  });
+
+  const app = createApp({ connection, logger });
+  const server = app.listen(config.port, () => {
+    logger.info({ port: config.port }, "analytics-service listening");
+  });
+
+  async function shutdown(signal) {
+    logger.info({ signal }, "shutting down");
+    await consumer.disconnect();
+    await new Promise((resolve) => server.close(resolve));
+    await connection.close();
+    process.exit(0);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+main().catch((err) => {
+  logger.error({ err }, "analytics-service failed to start");
+  process.exit(1);
+});

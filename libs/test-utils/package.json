@@ -1,0 +1,11 @@
+{
+  "name": "@vsb/test-utils",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "dependencies": {
+    "mongodb-memory-server": "^11.2.0",
+    "mongoose": "^9.9.4"
+  }
+}

@@ -1,0 +1,185 @@
+name: vsb-microservices
+
+networks:
+  vsb-net:
+    driver: bridge
+
+volumes:
+  redpanda-data:
+  mongo-data:
+
+services:
+  # --- Event bus ---
+  redpanda:
+    image: redpandadata/redpanda:v26.2.2
+    container_name: vsb-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+    ports:
+      - "19092:19092" # Kafka API (host access)
+      - "18081:18081" # Schema registry
+      - "18082:18082" # HTTP proxy
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    networks: [vsb-net]
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redpanda-console:
+    image: redpandadata/console:v3.11.0
+    container_name: vsb-redpanda-console
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8080:8080" # topic inspector UI: http://localhost:8080
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks: [vsb-net]
+
+  # --- Datastores (shared instance for dev; production would split per-service) ---
+  # Runs as a single-node replica set, not a standalone mongod, because
+  # @vsb/event-bus's outbox pattern needs transactions + change streams —
+  # matches how MongoDB Atlas already runs in production (always a replica
+  # set), so the same code path is exercised in dev and prod.
+  mongo:
+    image: mongo:8.3
+    container_name: vsb-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks: [vsb-net]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: initiates the replica set on first boot, then exits. Services
+  # that need Mongo wait on this via `condition: service_completed_successfully`
+  # rather than just on `mongo`'s healthcheck, since `mongod --replSet` answers
+  # pings before the replica set is actually initiated.
+  mongo-init:
+    image: mongo:8.3
+    container_name: vsb-mongo-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks: [vsb-net]
+    entrypoint:
+      - bash
+      - -c
+      - |
+        mongosh --host mongo:27017 --quiet --eval '
+          try {
+            rs.status();
+            print("replica set already initiated");
+          } catch (e) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
+            print("replica set initiated");
+          }
+        '
+
+  redis:
+    image: redis:8.8-alpine
+    container_name: vsb-redis
+    ports:
+      - "6379:6379"
+    networks: [vsb-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- Pilot services ---
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: vsb-api-gateway
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      PROMOTIONS_SERVICE_URL: http://promotions-service:3001
+      ANALYTICS_SERVICE_URL: http://analytics-service:3003
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - promotions-service
+      - analytics-service
+    networks: [vsb-net]
+
+  promotions-service:
+    build:
+      context: ..
+      dockerfile: services/promotions-service/Dockerfile
+    container_name: vsb-promotions-service
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "3001:3001"
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+    networks: [vsb-net]
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: services/notification-service/Dockerfile
+    container_name: vsb-notification-service
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "3002:3002"
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+    networks: [vsb-net]
+
+  analytics-service:
+    build:
+      context: ..
+      dockerfile: services/analytics-service/Dockerfile
+    container_name: vsb-analytics-service
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "3003:3003"
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+    networks: [vsb-net]

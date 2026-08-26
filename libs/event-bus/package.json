@@ -1,0 +1,18 @@
+{
+  "name": "@vsb/event-bus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "mongoose": "^9.9.4"
+  },
+  "devDependencies": {
+    "@vsb/test-utils": "workspace:*",
+    "vitest": "^4.1.11"
+  }
+}
