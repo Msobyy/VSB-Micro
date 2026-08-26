@@ -1,0 +1,52 @@
+# Runs on every push/PR (unlike vsb-backend/vsb-crm-backend's workflows,
+# which are manual-dispatch-only due to exhausted Actions billing on this
+# org — vsb-microservices was deliberately set up to run automatically
+# instead, per an explicit choice when this repo was created).
+#
+# Integration tests are NOT run here, matching vsb-backend's own
+# test.yml precedent: mongodb-memory-server's binary download is slow/
+# flaky on CI cold starts. Run them locally before merging anything that
+# touches @vsb/event-bus's outbox/idempotency logic or a service's Mongo
+# model.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test
+
+  docker-build:
+    name: Docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api-gateway, promotions-service, notification-service, analytics-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: false
