@@ -33,3 +33,7 @@ pnpm --filter @vsb/analytics-service test:integration
   Kafka's per-consumer-group delivery tracking.
 - Routes live at `/api/v1/analytics/*`, matching the full path
   `api-gateway` forwards unmodified.
+- `server.js` creates a second Kafka producer (`dlqProducer`) purely for
+  `runConsumer`'s DLQ fallback — see `docs/event-catalog.md`'s Conventions
+  section. Any service consuming via `runConsumer` needs one, since
+  `@vsb/event-bus` never creates connections on a service's behalf.

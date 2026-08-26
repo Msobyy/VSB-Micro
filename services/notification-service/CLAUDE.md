@@ -39,3 +39,7 @@ pnpm --filter @vsb/notification-service test:integration
 - There's no real driver-service yet, so there's no actual FCM device-token
   lookup — see that consumer file's NOTE for what a real extraction would
   need to add.
+- `server.js` creates a second Kafka producer (`dlqProducer`) purely for
+  `runConsumer`'s DLQ fallback — see `docs/event-catalog.md`'s Conventions
+  section. Any service consuming via `runConsumer` needs one, since
+  `@vsb/event-bus` never creates connections on a service's behalf.

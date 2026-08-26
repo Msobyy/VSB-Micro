@@ -54,6 +54,12 @@ export to Jaeger locally (`infra/docker-compose.dev.yaml`); any service
 built on `@vsb/event-bus`'s helpers (`buildOutboxDocument`,
 `startOutboxRelay`, `runConsumer`) gets this for free.
 
+Every consumer built on `runConsumer` also gets poison-message handling
+for free: a failing handler is retried a few times in-process, then routed
+to `<topic>.dlq` instead of crash-looping the consumer or blocking
+everything queued behind it — see `docs/event-catalog.md`'s Conventions
+section and `libs/event-bus/src/dlq.js`.
+
 ## Realtime/Socket.IO (future — not built)
 
 A future `realtime-gateway` should stay intentionally "dumb": authenticate

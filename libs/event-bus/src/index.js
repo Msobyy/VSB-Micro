@@ -7,3 +7,4 @@ export { getOutboxModel, withTransaction, buildOutboxDocument } from "./outbox.j
 export { startOutboxRelay } from "./outboxRelay.js";
 export { getProcessedEventModel, withIdempotency } from "./idempotency.js";
 export { runConsumer } from "./consume.js";
+export { dlqTopicFor } from "./dlq.js";

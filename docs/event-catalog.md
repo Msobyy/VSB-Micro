@@ -13,6 +13,13 @@
   `libs/event-bus/src/idempotency.js`.
 - **Reliability**: transactional outbox on the producer side — see
   `libs/event-bus/src/outbox.js` + `outboxRelay.js`.
+- **Poison messages**: `runConsumer` (`libs/event-bus/src/consume.js`)
+  retries a failing handler up to 3 times in-process, then publishes to
+  `<topic>.dlq` (`dlq.js`) and moves on, rather than crash-looping the
+  whole consumer on the same message forever or blocking everything queued
+  behind it on that partition. A DLQ message carries the original
+  envelope, the error + stack trace, attempt count, and which service's
+  consumer group gave up on it.
 
 ## Topics
 

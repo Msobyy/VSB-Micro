@@ -7,7 +7,7 @@
 // instrument kafkajs specifically.
 import mongoose from "mongoose";
 import { createLogger } from "@vsb/logger";
-import { createKafkaClient, createConsumer, runConsumer } from "@vsb/event-bus";
+import { createKafkaClient, createConsumer, createProducer, runConsumer } from "@vsb/event-bus";
 import { TOPICS } from "@vsb/event-schemas";
 import { config } from "./config/index.js";
 import { createApp } from "./app.js";
@@ -22,13 +22,18 @@ async function main() {
 
   const kafka = createKafkaClient({ clientId: config.kafka.clientId, brokers: config.kafka.brokers });
   const consumer = await createConsumer(kafka, config.kafkaGroupId);
+  // Same producer instance publishes to a <topic>.dlq if the handler
+  // exhausts its retries — see @vsb/event-bus's dlq.js.
+  const dlqProducer = await createProducer(kafka);
 
   const handler = couponRedeemedConsumer({ connection, logger });
   const consumeLoop = runConsumer({
     consumer,
+    producer: dlqProducer,
     topics: [TOPICS.PROMOTIONS_COUPON_REDEEMED],
     handler,
     logger,
+    serviceName: config.serviceName,
   });
   consumeLoop.catch((err) => {
     logger.error({ err }, "consumer loop crashed");
@@ -43,6 +48,7 @@ async function main() {
   async function shutdown(signal) {
     logger.info({ signal }, "shutting down");
     await consumer.disconnect();
+    await dlqProducer.disconnect();
     await new Promise((resolve) => server.close(resolve));
     await connection.close();
     process.exit(0);
