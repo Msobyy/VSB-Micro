@@ -32,10 +32,14 @@ export function verifyOtpHandler(service) {
     if (result.isNewUser) {
       return res.status(200).json({ isNewUser: true });
     }
+    // No firstName here — auth-service doesn't store profile data (see
+    // passengerAuthService.js's register() comment). A client that needs
+    // the passenger's name for display calls passenger-service for it,
+    // once it exists.
     res.status(200).json({
       isNewUser: false,
       token: result.token,
-      passenger: { id: result.passenger._id, firstName: result.passenger.firstName, phone: result.passenger.phone },
+      passenger: { id: result.passenger._id, phone: result.passenger.phone },
     });
   };
 }
@@ -48,7 +52,7 @@ export function registerHandler(service) {
       throw ApiError.badRequest("firstName, lastName, gender and deviceToken are required", { code: "INVALID_BODY" });
     }
 
-    const { token, passenger } = await service.register({
+    const { token, passenger, profile } = await service.register({
       firstName,
       lastName,
       gender,
@@ -59,7 +63,10 @@ export function registerHandler(service) {
       city,
     });
 
-    res.status(201).json({ token, passenger: { id: passenger._id, firstName: passenger.firstName, phone: passenger.phone } });
+    // profile fields are echoed straight from the request — the client
+    // just typed them, no need to round-trip through this service's DB
+    // (which doesn't store them; see passengerAuthService.js).
+    res.status(201).json({ token, passenger: { id: passenger._id, phone: passenger.phone, ...profile } });
   };
 }
 

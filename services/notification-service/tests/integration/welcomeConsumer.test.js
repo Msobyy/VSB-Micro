@@ -26,7 +26,7 @@ describe("welcomeConsumer", () => {
       eventVersion: 1,
       source: "auth-service",
       partitionKey: "passenger_1",
-      payload: { passengerId: "passenger_1", firstName: "Amina", phone: "+923001234567" },
+      payload: { passengerId: "passenger_1", phone: "+923001234567", firstName: "Amina", lastName: "Khan", gender: "Female" },
     });
   }
 

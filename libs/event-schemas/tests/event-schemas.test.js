@@ -41,15 +41,30 @@ describe("passengerRegisteredEventV1", () => {
     occurredAt: new Date().toISOString(),
     source: "auth-service",
     partitionKey: "passenger_123",
-    payload: { passengerId: "passenger_123", firstName: "Amina", phone: "+923001234567" },
+    payload: {
+      passengerId: "passenger_123",
+      phone: "+923001234567",
+      firstName: "Amina",
+      lastName: "Khan",
+      gender: "Female",
+    },
   };
 
   it("accepts a well-formed event", () => {
     expect(passengerRegisteredEventV1.safeParse(validEvent).success).toBe(true);
   });
 
+  it("accepts optional email/city being omitted", () => {
+    expect(passengerRegisteredEventV1.safeParse(validEvent).success).toBe(true);
+  });
+
   it("rejects a payload missing required fields", () => {
     const invalid = { ...validEvent, payload: { passengerId: "passenger_123" } };
+    expect(passengerRegisteredEventV1.safeParse(invalid).success).toBe(false);
+  });
+
+  it("rejects an unsupported gender", () => {
+    const invalid = { ...validEvent, payload: { ...validEvent.payload, gender: "Other-invalid" } };
     expect(passengerRegisteredEventV1.safeParse(invalid).success).toBe(false);
   });
 });

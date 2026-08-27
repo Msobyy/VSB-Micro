@@ -56,10 +56,19 @@ Payload:
 ```json
 {
   "passengerId": "68a...",
+  "phone": "+923001234567",
   "firstName": "Amina",
-  "phone": "+923001234567"
+  "lastName": "Khan",
+  "gender": "Female",
+  "email": "amina@example.com",
+  "city": "Lahore"
 }
 ```
+
+Carries the full profile snapshot, not just what auth-service itself
+needs — auth-service only persists identity fields (see
+`services/auth-service/CLAUDE.md`); this event is how a future
+passenger-service would build its own profile record.
 
 ## Manual end-to-end check
 

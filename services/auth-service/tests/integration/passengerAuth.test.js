@@ -75,6 +75,15 @@ describe("passenger auth flow", () => {
     const outboxRow = await getOutboxModel(connection).findOne({ topic: "auth.passenger.registered" });
     expect(outboxRow).not.toBeNull();
     expect(outboxRow.envelope.payload.firstName).toBe("Amina");
+
+    // The response still carries the profile (echoed from the request)...
+    expect(registerRes.body.passenger).toMatchObject({ firstName: "Amina", lastName: "Khan", gender: "Female" });
+    // ...but auth-service's own DB row must NOT persist it — that's
+    // passenger-service's data, auth-service only owns identity/session.
+    const stored = await getPassengerModel(connection).findById(registerRes.body.passenger.id).lean();
+    expect(stored.firstName).toBeUndefined();
+    expect(stored.lastName).toBeUndefined();
+    expect(stored.phone).toBe(`+92${phoneNumber}`);
   }, 30000);
 
   it("logs in an existing passenger on verify-otp", async () => {

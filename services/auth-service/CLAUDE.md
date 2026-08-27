@@ -26,6 +26,16 @@ pnpm --filter @vsb/auth-service test:integration
 
 ## Architecture
 
+- **Identity only, not profile.** `src/models/passengerModel.js` holds
+  phone/role/session/block-status fields only — no firstName/lastName/
+  gender/city. Those are profile data, a different bounded context that
+  belongs to a future `passenger-service`. `register()` accepts them
+  (the client collects them at signup) but only ever puts them in the
+  `auth.passenger.registered` event payload and the HTTP response —
+  never persists them here. See `passengerAuthService.js`'s `register()`
+  comment for the reasoning and the known gap this creates (email
+  uniqueness isn't enforced by anyone yet, since auth-service doesn't
+  store email and passenger-service doesn't exist).
 - `src/providers/` is a swappable OTP-delivery contract (see
   `otpProvider.js`'s header comment) — same pattern as
   `notification-service`'s push providers. `jazzSmsOtpProvider.js` and

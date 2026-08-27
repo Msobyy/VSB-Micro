@@ -67,23 +67,29 @@ export function createPassengerAuthService({ connection, otpService, config }) {
     return { isNewUser: false, token, passenger };
   }
 
+  // firstName/lastName/gender/email/city are accepted here (the client
+  // collects them in the same signup screen as OTP verification — a UX
+  // call, not an architecture one) but deliberately NOT persisted on the
+  // Passenger document — that's profile data, a future passenger-
+  // service's job to own. They flow into the event payload below (for
+  // passenger-service to build its own record from) and straight back
+  // into the HTTP response, without ever touching this service's DB.
+  //
+  // KNOWN GAP: email uniqueness isn't enforced here since email isn't
+  // stored — auth-service only owns phone as a login identifier, and
+  // email was never actually used to log in anywhere in this system.
+  // That constraint becomes passenger-service's job once it exists.
   async function register({ firstName, lastName, gender, countryCode, phoneNumber, deviceToken, email, city }) {
     const phone = buildPhone(countryCode, phoneNumber);
     const Outbox = getOutboxModel(connection);
 
-    const existing = await Passenger.findOne({
-      is_deleted: false,
-      $or: [{ phone }, ...(email ? [{ email }] : [])],
-    });
+    const existing = await Passenger.findOne({ phone, is_deleted: false });
     if (existing) {
-      throw ApiError.conflict("An account with this phone or email already exists", { code: "ACCOUNT_EXISTS" });
+      throw ApiError.conflict("An account with this phone already exists", { code: "ACCOUNT_EXISTS" });
     }
 
     return withTransaction(connection, async (session) => {
-      const [passenger] = await Passenger.create(
-        [{ firstName, lastName, gender, phone, email, city, is_verified: true }],
-        { session },
-      );
+      const [passenger] = await Passenger.create([{ phone, is_verified: true }], { session });
 
       const token = signToken({ id: passenger._id.toString(), role: passenger.role }, config.jwtSecret);
       passenger.currentToken = token;
@@ -91,12 +97,14 @@ export function createPassengerAuthService({ connection, otpService, config }) {
       passenger.lastLogin = new Date();
       await passenger.save({ session });
 
+      const profile = { firstName, lastName, gender, email, city };
+
       const envelope = buildEventEnvelope({
         eventType: PASSENGER_REGISTERED_TOPIC,
         eventVersion: 1,
         source: "auth-service",
         partitionKey: passenger._id.toString(),
-        payload: { passengerId: passenger._id.toString(), firstName: passenger.firstName, phone: passenger.phone },
+        payload: { passengerId: passenger._id.toString(), phone: passenger.phone, ...profile },
       });
 
       const parsed = passengerRegisteredEventV1.safeParse(envelope);
@@ -112,7 +120,7 @@ export function createPassengerAuthService({ connection, otpService, config }) {
         { session },
       );
 
-      return { token, passenger };
+      return { token, passenger, profile };
     });
   }
 
