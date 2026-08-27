@@ -1,31 +1,43 @@
-// JWT verification, edge-of-system: this is where a real deployment would
-// enforce auth once, rather than every downstream service re-verifying —
-// matches vsb-backend's own passenger/driver/CRM authMiddleware.js pairs in
-// spirit (verify + attach req.user), just consolidated to one place instead
-// of three separate JWT domains.
+// JWT verification, edge-of-system: this is where a real deployment
+// enforces auth once, rather than every downstream service re-verifying —
+// matches vsb-backend's own passenger/driver/CRM authMiddleware.js pairs
+// in spirit (verify + attach req.user), just consolidated to one place.
 //
-// STUBBED for this pilot: there's no auth-service yet minting real tokens,
-// so this decodes-if-present and attaches req.user, but does not reject
-// requests with no/invalid token — routes stay open so the pilot's curl
-// walkthrough (docs/event-catalog.md) works without a token. Flip
-// `attachUser` to a hard-reject once auth-service exists and real clients
-// send tokens.
-import jwt from "jsonwebtoken";
-
-export function verifyToken(token, secret) {
-  return jwt.verify(token, secret);
-}
-
+// Delegates to auth-service's POST /api/v1/auth/verify rather than
+// decoding the JWT locally — a local signature-only check would miss
+// revocation (logout/block), since that's actually implemented as a DB
+// session-token match, not JWT expiry. See auth-service's
+// passengerAuthService.js for why that distinction matters.
+//
+// Still non-blocking: a missing/invalid token passes through rather than
+// being rejected. The promotions/analytics routes behind this middleware
+// don't require auth today; deciding a real enforcement policy is a
+// later increment once driver/CRM domains exist too. This is a mechanism
+// swap (fake local decode -> real remote verify), not a policy change.
 export function attachUser(config, logger) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const header = req.headers.authorization;
     if (!header?.startsWith("Bearer ")) return next();
 
+    const token = header.slice("Bearer ".length);
+    const deviceToken = req.headers["device-token"];
+
     try {
-      req.user = verifyToken(header.slice("Bearer ".length), config.jwtSecret);
+      const response = await fetch(`${config.authServiceUrl}/api/v1/auth/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, deviceToken }),
+      });
+      const result = await response.json();
+      if (result.valid) {
+        req.user = result.passenger;
+      } else {
+        logger.warn("auth-service rejected the bearer token, continuing unauthenticated");
+      }
     } catch (err) {
-      logger.warn({ err: err.message }, "rejected invalid bearer token, continuing unauthenticated");
+      logger.warn({ err: err.message }, "auth-service verify call failed, continuing unauthenticated");
     }
+
     next();
   };
 }

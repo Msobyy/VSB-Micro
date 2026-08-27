@@ -43,9 +43,28 @@ Payload:
 }
 ```
 
+### `auth.passenger.registered`
+
+| | |
+|---|---|
+| Producer | `auth-service` (`src/services/passengerAuthService.js`) |
+| Consumers | `notification-service` (welcome push) |
+| Partition key | `passengerId` |
+| Schema | `libs/event-schemas/src/events/passengerRegisteredV1.js` |
+
+Payload:
+```json
+{
+  "passengerId": "68a...",
+  "firstName": "Amina",
+  "phone": "+923001234567"
+}
+```
+
 ## Manual end-to-end check
 
-With `docker compose -f infra/docker-compose.dev.yaml up` running, seed a
+With `docker compose --env-file .env -f infra/docker-compose.dev.yaml up`
+running (see README for why `--env-file .env` is required), seed a
 coupon first (no create-coupon endpoint exists in this pilot):
 
 ```bash
@@ -75,3 +94,38 @@ Then:
   spans in `notification-service` and `analytics-service`) — see
   `docs/architecture-decision-records/0004-otel-preload-not-import.md` for
   how the Kafka boundary specifically is traced.
+
+### Passenger auth walkthrough
+
+With the stack up and `auth-service`'s Redis Cloud credentials set in the
+root `.env` (see `.env.example`):
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/send-otp \
+  -H 'Content-Type: application/json' \
+  -d '{"countryCode": "+92", "phoneNumber": "3001234567"}'
+```
+
+Check `auth-service`'s container logs for the OTP (console provider, no
+real credentials configured by default). Then:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/verify-otp \
+  -H 'Content-Type: application/json' \
+  -d '{"countryCode": "+92", "phoneNumber": "3001234567", "otp": "<code from logs>", "deviceToken": "device-1"}'
+# {"isNewUser": true} — no account yet, register one:
+
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"countryCode": "+92", "phoneNumber": "3001234567", "firstName": "Amina", "lastName": "Khan", "gender": "Female", "deviceToken": "device-1"}'
+```
+
+Then:
+- Check `notification-service` logs for a "Welcome to VSisters" push.
+- Open Redpanda Console → `auth.passenger.registered` → confirm the message.
+- `curl -X POST http://localhost:3000/api/v1/auth/verify -d '{"token": "<token from register>", "deviceToken": "device-1"}'`
+  → `{"valid": true, ...}`. Log out (`POST /api/v1/auth/logout` with the
+  token as a Bearer header and the same `device-token` header), then
+  repeat the same `/verify` call — it should now return `{"valid": false}`,
+  proving the session-revocation check actually works (not just JWT
+  expiry — see `auth-service/CLAUDE.md`).

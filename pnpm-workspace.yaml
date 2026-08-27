@@ -14,3 +14,4 @@ minimumReleaseAgeExclude:
   - '@turbo/windows-arm64@2.10.12'
   - mongoose@9.9.4
   - turbo@2.10.12
+  - axios@1.20.0

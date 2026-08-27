@@ -38,6 +38,6 @@ node scripts/seedCoupon.js TEST10 flat 150       # seed a coupon — no create e
 
 ## Requires
 
-A replica-set-backed Mongo (transactions + change streams) — see the root
-`.env.example` for the local-dev caveat about `/etc/hosts` if running this
-service outside Docker against the dockerized Mongo.
+A replica-set-backed Mongo (transactions + change streams) — MongoDB
+Atlas, per the root `.env.example` (see ADR 0007). Atlas is always a
+replica set, so no local bootstrapping is needed.

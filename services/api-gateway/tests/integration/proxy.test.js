@@ -29,7 +29,7 @@ describe("api-gateway proxy routing", () => {
     fakePromotionsUrl = `http://127.0.0.1:${port}`;
 
     const config = {
-      jwtSecret: "test-secret",
+      authServiceUrl: "http://127.0.0.1:1", // unused in these tests
       promotionsServiceUrl: fakePromotionsUrl,
       analyticsServiceUrl: "http://127.0.0.1:1", // unused in these tests
     };

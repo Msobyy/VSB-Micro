@@ -63,9 +63,16 @@ export function loadSharedConfig() {
       clientId: getConfigValue("kafka_client_id", "KAFKA_CLIENT_ID", "vsb-microservices"),
     },
     mongoUri: getConfigValue("mongo_uri", "MONGO_URI", "mongodb://localhost:27017"),
+    // Matches vsb-backend/config/index.js's shape (host/port/username/
+    // password kept separate, never a combined connection string) — this
+    // points at a managed Redis Cloud instance, not a self-hosted
+    // container, same as production already does. See
+    // docs/architecture-decision-records/0006-redis-cloud-per-service-ownership.md.
     redis: {
       host: getConfigValue("redis_host", "REDIS_HOST", "localhost"),
       port: getConfigInt("redis_port", "REDIS_PORT", 6379),
+      username: getConfigValue("redis_username", "REDIS_USERNAME"),
+      password: getConfigValue("redis_password", "REDIS_PASSWORD"),
     },
     jwtSecret: getConfigValue("jwt_secret", "JWT_SECRET", "dev-secret-change-me"),
   };

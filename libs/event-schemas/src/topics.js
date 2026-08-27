@@ -5,4 +5,5 @@
  */
 export const TOPICS = Object.freeze({
   PROMOTIONS_COUPON_REDEEMED: "promotions.coupon.redeemed",
+  AUTH_PASSENGER_REGISTERED: "auth.passenger.registered",
 });

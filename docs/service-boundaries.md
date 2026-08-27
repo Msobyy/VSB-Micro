@@ -1,21 +1,21 @@
 # Service boundaries
 
 Target reference architecture for the eventual full migration. Only
-`api-gateway`, `promotions-service`, `notification-service`, and
-`analytics-service` are actually built so far (the pilot slice — see
-`architecture-decision-records/`); everything else below is the target map
-this pilot is meant to prove out, not yet-built code.
+`api-gateway`, `promotions-service`, `notification-service`,
+`analytics-service`, and `auth-service` (passenger auth only) are
+actually built so far; everything else below is the target map this
+build-out is meant to prove out, not yet-built code.
 
 Derived from `vsb-backend`'s and `vsb-crm-backend`'s existing `models/`,
 `controllers/`, `services/`, and `routes/` directories.
 
 | Service | Owns (from current monolith code) | Status |
 |---|---|---|
-| `api-gateway` | Routes REST calls to services, JWT verification at the edge | Built (pilot) |
+| `api-gateway` | Routes REST calls to services, auth verification at the edge | Built |
 | `promotions-service` | `bonusModel`, `bonusRuleService`, `boostService`, `couponModel` | Built (pilot, coupons only) |
-| `notification-service` | FCM push (`fcmBatchHelper`), WhatsApp/SMS delivery | Built (pilot, push only) |
+| `notification-service` | FCM push (`fcmBatchHelper`), WhatsApp/SMS delivery | Built (coupon-redeemed + passenger-registered pushes) |
 | `analytics-service` | CQRS read-model: driver performance, audit logs, telemetry, demand aggregation | Built (pilot, coupon redemptions only) |
-| `auth-service` | 3 JWT domains (passenger/driver/CRM), OTP, RBAC/permissions | Not built |
+| `auth-service` | 3 JWT domains (passenger/driver/CRM), OTP, RBAC/permissions | Built (**passenger only** — driver and CRM/admin auth are structurally different and not yet built, see that service's CLAUDE.md) |
 | `driver-service` | `driverModel`, `vehicleModel`, shift lifecycle, document/selfie uploads (S3/Rekognition) | Not built |
 | `passenger-service` | `passengerModel` and passenger profile concerns | Not built |
 | `location-service` | Redis geo, `nearbyDriversV2/*`, h3-js bucketing, demand heatmap, surge forecast | Not built |
@@ -59,6 +59,16 @@ for free: a failing handler is retried a few times in-process, then routed
 to `<topic>.dlq` instead of crash-looping the consumer or blocking
 everything queued behind it — see `docs/event-catalog.md`'s Conventions
 section and `libs/event-bus/src/dlq.js`.
+
+## Redis
+
+Managed Redis Cloud (matching production), not a self-hosted container —
+`auth-service` is the first consumer. Every service owns its Redis data;
+no service ever reads another service's keys directly (own `db` index +
+`keyPrefix`, no exceptions) — see
+`docs/architecture-decision-records/0006-redis-cloud-per-service-ownership.md`
+for why the monolith's `vsb-crm-backend` reading `vsb-backend`'s Redis
+directly for presence data is explicitly not a pattern to carry forward.
 
 ## Realtime/Socket.IO (future — not built)
 

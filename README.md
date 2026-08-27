@@ -8,22 +8,32 @@ why it's built this way.
 
 ## Status
 
-Pilot slice only — proves the event-driven pattern end-to-end with the
-lowest-risk real domain (coupon redemption) before extracting anything
-higher-stakes. See `docs/service-boundaries.md` for what's built vs. planned.
+Five services built so far: `api-gateway`, `promotions-service`,
+`notification-service`, `analytics-service`, `auth-service` (passenger
+auth only). See `docs/service-boundaries.md` for the full target map and
+what's built vs. planned.
 
 ## Quick start
 
 ```bash
 pnpm install
-docker compose -f infra/docker-compose.dev.yaml up --build
+cp .env.example .env   # then set MONGO_URI (Atlas) and REDIS_HOST/PORT/
+                        # USERNAME/PASSWORD (Redis Cloud) — real (test)
+                        # cloud credentials, see .env.example and ADRs
+                        # 0006 / 0007
+docker compose --env-file .env -f infra/docker-compose.dev.yaml up --build
 ```
+
+`--env-file .env` is required, not optional — Docker Compose's automatic
+`.env` lookup only checks next to the compose file (`infra/`), not the
+repo root where this one lives, so without the flag `MONGO_URI`/`REDIS_*`
+silently resolve to empty strings and every service fails to connect.
 
 - API gateway: http://localhost:3000
 - Redpanda Console (topic inspector): http://localhost:8080
 - Jaeger UI (distributed traces): http://localhost:16686
 
-There's no create-coupon endpoint in this pilot (redemption only — see
+There's no create-coupon endpoint (redemption only — see
 `services/promotions-service/CLAUDE.md`), so seed one first:
 
 ```bash

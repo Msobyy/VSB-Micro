@@ -14,7 +14,7 @@ import { TOPICS } from "@vsb/event-schemas";
 import { config } from "./config/index.js";
 import { createApp } from "./app.js";
 import { createPushProvider } from "./providers/index.js";
-import { couponRedeemedConsumer } from "./events/consumers/couponRedeemedConsumer.js";
+import { createEventRouter } from "./events/consumers/index.js";
 
 const logger = createLogger(config.serviceName);
 
@@ -32,11 +32,11 @@ async function main() {
   // exhausts its retries — see @vsb/event-bus's dlq.js.
   const dlqProducer = await createProducer(kafka);
 
-  const handler = couponRedeemedConsumer({ connection, pushProvider, logger });
+  const handler = createEventRouter({ connection, pushProvider, logger });
   const consumeLoop = runConsumer({
     consumer,
     producer: dlqProducer,
-    topics: [TOPICS.PROMOTIONS_COUPON_REDEEMED],
+    topics: [TOPICS.PROMOTIONS_COUPON_REDEEMED, TOPICS.AUTH_PASSENGER_REGISTERED],
     handler,
     logger,
     serviceName: config.serviceName,

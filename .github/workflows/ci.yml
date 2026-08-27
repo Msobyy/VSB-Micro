@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [api-gateway, promotions-service, notification-service, analytics-service]
+        service: [api-gateway, promotions-service, notification-service, analytics-service, auth-service]
     steps:
       - uses: actions/checkout@v4
 

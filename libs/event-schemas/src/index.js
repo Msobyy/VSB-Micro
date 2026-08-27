@@ -8,3 +8,8 @@ export {
   couponRedeemedPayloadV1,
   couponRedeemedEventV1,
 } from "./events/couponRedeemedV1.js";
+export {
+  PASSENGER_REGISTERED_TOPIC,
+  passengerRegisteredPayloadV1,
+  passengerRegisteredEventV1,
+} from "./events/passengerRegisteredV1.js";

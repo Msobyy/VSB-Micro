@@ -17,6 +17,7 @@ describe("ApiError", () => {
     expect(ApiError.notFound("missing").statusCode).toBe(404);
     expect(ApiError.badRequest("bad").statusCode).toBe(400);
     expect(ApiError.conflict("dup").statusCode).toBe(409);
+    expect(ApiError.unauthorized("nope").statusCode).toBe(401);
   });
 });
 

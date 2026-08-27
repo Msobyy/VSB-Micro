@@ -6,7 +6,6 @@ networks:
 
 volumes:
   redpanda-data:
-  mongo-data:
 
 services:
   # --- Event bus ---
@@ -51,62 +50,14 @@ services:
         condition: service_healthy
     networks: [vsb-net]
 
-  # --- Datastores (shared instance for dev; production would split per-service) ---
-  # Runs as a single-node replica set, not a standalone mongod, because
-  # @vsb/event-bus's outbox pattern needs transactions + change streams —
-  # matches how MongoDB Atlas already runs in production (always a replica
-  # set), so the same code path is exercised in dev and prod.
-  mongo:
-    image: mongo:8.3
-    container_name: vsb-mongo
-    command: ["--replSet", "rs0", "--bind_ip_all"]
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-    networks: [vsb-net]
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # One-shot: initiates the replica set on first boot, then exits. Services
-  # that need Mongo wait on this via `condition: service_completed_successfully`
-  # rather than just on `mongo`'s healthcheck, since `mongod --replSet` answers
-  # pings before the replica set is actually initiated.
-  mongo-init:
-    image: mongo:8.3
-    container_name: vsb-mongo-init
-    depends_on:
-      mongo:
-        condition: service_healthy
-    networks: [vsb-net]
-    entrypoint:
-      - bash
-      - -c
-      - |
-        mongosh --host mongo:27017 --quiet --eval '
-          try {
-            rs.status();
-            print("replica set already initiated");
-          } catch (e) {
-            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
-            print("replica set initiated");
-          }
-        '
-
-  redis:
-    image: redis:8.8-alpine
-    container_name: vsb-redis
-    ports:
-      - "6379:6379"
-    networks: [vsb-net]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+  # --- Datastores ---
+  # No local Mongo or Redis container — every service connects to managed
+  # MongoDB Atlas / Redis Cloud (MONGO_URI / REDIS_HOST etc. in the root
+  # .env, gitignored), same as production already does. Atlas is always a
+  # replica set, which is what @vsb/event-bus's outbox pattern needs
+  # (transactions + change streams) — see
+  # docs/architecture-decision-records/0007-mongodb-atlas-not-self-hosted.md
+  # and 0006-redis-cloud-per-service-ownership.md.
 
   # --- Observability ---
   # Jaeger v2 (built on the OpenTelemetry Collector core) — receives OTLP
@@ -135,6 +86,7 @@ services:
       PORT: 3000
       PROMOTIONS_SERVICE_URL: http://promotions-service:3001
       ANALYTICS_SERVICE_URL: http://analytics-service:3003
+      AUTH_SERVICE_URL: http://auth-service:3004
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_SERVICE_NAME: api-gateway
@@ -144,6 +96,7 @@ services:
     depends_on:
       - promotions-service
       - analytics-service
+      - auth-service
       - jaeger
     networks: [vsb-net]
 
@@ -155,7 +108,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3001
-      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_URI: ${MONGO_URI}
       KAFKA_BROKERS: redpanda:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_SERVICE_NAME: promotions-service
@@ -163,8 +116,6 @@ services:
     ports:
       - "3001:3001"
     depends_on:
-      mongo-init:
-        condition: service_completed_successfully
       redpanda:
         condition: service_healthy
       jaeger:
@@ -179,7 +130,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3002
-      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_URI: ${MONGO_URI}
       KAFKA_BROKERS: redpanda:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_SERVICE_NAME: notification-service
@@ -187,8 +138,6 @@ services:
     ports:
       - "3002:3002"
     depends_on:
-      mongo-init:
-        condition: service_completed_successfully
       redpanda:
         condition: service_healthy
       jaeger:
@@ -203,7 +152,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3003
-      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_URI: ${MONGO_URI}
       KAFKA_BROKERS: redpanda:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_SERVICE_NAME: analytics-service
@@ -211,8 +160,37 @@ services:
     ports:
       - "3003:3003"
     depends_on:
-      mongo-init:
-        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    networks: [vsb-net]
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/auth-service/Dockerfile
+    container_name: vsb-auth-service
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      MONGO_URI: ${MONGO_URI}
+      KAFKA_BROKERS: redpanda:9092
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      # Redis Cloud — matches production's approach (see ADR 0006), not a
+      # local container. Set these in a root .env (gitignored); the
+      # service falls back to an unauthenticated localhost Redis if unset.
+      REDIS_HOST: ${REDIS_HOST:-localhost}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: 0
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: auth-service
+      NODE_OPTIONS: --require @opentelemetry/auto-instrumentations-node/register
+    ports:
+      - "3004:3004"
+    depends_on:
       redpanda:
         condition: service_healthy
       jaeger:
