@@ -122,11 +122,14 @@ real credentials configured by default). Then:
 curl -X POST http://localhost:3000/api/v1/auth/verify-otp \
   -H 'Content-Type: application/json' \
   -d '{"countryCode": "+92", "phoneNumber": "3001234567", "otp": "<code from logs>", "deviceToken": "device-1"}'
-# {"isNewUser": true} — no account yet, register one:
+# {"isNewUser": true, "registrationTicket": "<jwt>"} — no account yet.
+# registrationTicket is required by /register (10 min TTL, bound to this
+# exact phone) — proof an OTP was actually checked; see
+# docs/architecture-decision-records/0009-auth-service-hardening.md.
 
 curl -X POST http://localhost:3000/api/v1/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"countryCode": "+92", "phoneNumber": "3001234567", "firstName": "Amina", "lastName": "Khan", "gender": "Female", "deviceToken": "device-1"}'
+  -d '{"countryCode": "+92", "phoneNumber": "3001234567", "firstName": "Amina", "lastName": "Khan", "gender": "Female", "deviceToken": "device-1", "registrationTicket": "<ticket from verify-otp>"}'
 ```
 
 Then:

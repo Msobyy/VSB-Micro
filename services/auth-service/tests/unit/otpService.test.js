@@ -98,4 +98,42 @@ describe("otpService", () => {
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/expired or not sent/);
   });
+
+  // A security audit found the block-check/compare/increment sequence
+  // was three separate non-atomic Redis round-trips, letting a burst of
+  // concurrent guesses race past the 3-attempt cap before the block took
+  // effect. `latencyMs` on the fake makes these calls genuinely
+  // interleave through the event loop (see fakeRedis.js's header
+  // comment) instead of resolving synchronously, so this test actually
+  // exercises the race rather than trivially passing regardless of
+  // whether the fix is present.
+  it("only lets one concurrent request per phone actually reach the compare/increment logic", async () => {
+    const redis = createFakeRedis({ latencyMs: 5 });
+    const service = createOtpService({ redis, channels: { sms: fakeProvider() } });
+    await service.sendOtp("+923001234567");
+
+    const results = await Promise.all([
+      service.verifyOtp("+923001234567", "000000"),
+      service.verifyOtp("+923001234567", "000000"),
+      service.verifyOtp("+923001234567", "000000"),
+      service.verifyOtp("+923001234567", "000000"),
+      service.verifyOtp("+923001234567", "000000"),
+    ]);
+
+    const lockBusy = results.filter((r) => r.message === "Please try again in a moment.");
+    const processed = results.filter((r) => r.message !== "Please try again in a moment.");
+
+    // The lock fails fast rather than queueing — only whichever request
+    // wins the lock actually reaches the block-check/compare/increment
+    // sequence; the rest are rejected outright rather than being allowed
+    // to race it. That's what closes the vulnerability: not "everyone
+    // eventually gets a turn," just "nobody can sneak a guess in during
+    // another request's turn." If the old (unpatched) three-separate-
+    // round-trips version were still in place, all 5 would reach
+    // "processed" instead of 4 being rejected here.
+    expect(processed).toHaveLength(1);
+    expect(lockBusy).toHaveLength(4);
+    expect(processed[0].success).toBe(false);
+    expect(processed[0].message).toMatch(/attempt/i);
+  });
 });

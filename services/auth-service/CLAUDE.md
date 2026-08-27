@@ -65,5 +65,40 @@ pnpm --filter @vsb/auth-service test:integration
   why, and the condition under which to revisit it.
 - The QA/app-store-reviewer OTP bypass (`TEST_PHONE_NUMBERS`/fixed OTP,
   in `passengerAuthService.js`) is gated behind
-  `config.enableTestOtpBypass` (`ENABLE_TEST_OTP_BYPASS`) — off by
-  default, unlike the original where it was unconditionally active.
+  `config.enableTestOtpBypass` **and** `config.nodeEnv !== "production"` —
+  off by default, unlike the original where it was unconditionally
+  active, and now with a second independent guard so one accidentally-set
+  env var can't open it in a real deployment.
+
+## Hardening (see docs/architecture-decision-records/0009)
+
+A security audit run before this service gained any dependents found two
+critical, PoC-verified bypasses — both fixed, both with regression tests:
+
+- **`register()` required no proof an OTP was ever verified.** Fixed:
+  `verifyOtpAndLogin()` now issues a short-lived (10 min), phone-bound
+  `registrationTicket` (see `tokenService.js`'s `signRegistrationTicket`/
+  `verifyRegistrationTicket`) only after a real OTP check succeeds;
+  `register()` requires and validates one before creating an account.
+  Tagged with a distinct `purpose` claim so it can never be reused as (or
+  confused with) a real session token.
+- **NoSQL operator injection via `deviceToken`.** A JSON body can send
+  `deviceToken: {"$ne": null}` where a string is expected, and neither
+  Express nor Mongoose reject that on their own — it would flow straight
+  into `verifyToken()`'s Mongo filter and match any document, bypassing
+  device-session binding entirely for anyone holding a leaked bearer
+  token. Fixed: every controller validates `deviceToken`/`token`/phone
+  fields/`gender` as plain strings of a sane shape
+  (`passengerAuthController.js`'s `requireString`/`requirePhoneFields`/
+  `requireDeviceToken`) before anything reaches a query or the DB.
+
+Also added: per-IP rate limiting (`src/middlewares/rateLimit.js` — the
+per-phone cooldown in `otpService.js` alone doesn't stop one IP hitting
+`/send-otp` for many distinct numbers, each a real billed SMS/WhatsApp
+send), a startup check that refuses to run in production with a missing/
+default/short `JWT_SECRET` (`src/config/index.js`), a fix for a genuine
+TOCTOU race in `otpService.js`'s block-check/compare/increment sequence
+(now serialized per-phone via a short-lived Redis lock — see that file's
+header comment), a constant-time OTP comparison, and the shared
+`errorHandler` (`libs/http-errors`) no longer leaking `message`/`details`
+for any 500-class response, including a deliberate `ApiError.internal(...)`.

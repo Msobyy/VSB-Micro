@@ -42,3 +42,22 @@ export const config = {
     languageCode: getConfigValue("whatsapp_language_code", "WHATSAPP_LANGUAGE_CODE", "en_US"),
   },
 };
+
+// @vsb/config's jwtSecret falls back to a hardcoded, source-visible
+// default ("dev-secret-change-me") when JWT_SECRET is unset — fine for
+// local dev, silently catastrophic in production (every token this
+// service signs/verifies would use a secret anyone can read in this
+// repo). This service is the one that actually signs tokens with it, so
+// it's the one that fails fast at boot rather than starting up quietly
+// insecure. Found in a security audit before this service gained any
+// dependents.
+const MIN_JWT_SECRET_LENGTH = 32;
+const INSECURE_DEFAULT_JWT_SECRET = "dev-secret-change-me";
+if (
+  config.nodeEnv === "production" &&
+  (!config.jwtSecret || config.jwtSecret === INSECURE_DEFAULT_JWT_SECRET || config.jwtSecret.length < MIN_JWT_SECRET_LENGTH)
+) {
+  throw new Error(
+    `JWT_SECRET is missing, using the insecure default, or shorter than ${MIN_JWT_SECRET_LENGTH} characters — refusing to start in production.`,
+  );
+}

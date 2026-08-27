@@ -10,6 +10,8 @@
 import jwt from "jsonwebtoken";
 
 const TOKEN_EXPIRY = "30d";
+const REGISTRATION_TICKET_EXPIRY = "10m";
+const REGISTRATION_TICKET_PURPOSE = "registration";
 
 export function signToken({ id, role }, secret) {
   return jwt.sign({ id, role }, secret, { expiresIn: TOKEN_EXPIRY });
@@ -24,4 +26,26 @@ export function decodeToken(token, secret) {
   } catch {
     return null;
   }
+}
+
+// Proof that verify-otp actually succeeded for this exact phone, short-
+// lived (10 minutes — enough to fill in a signup form, not enough to be
+// useful for anything else) and tagged with a distinct `purpose` claim
+// so it can never be confused with (or reused as) a real session token.
+// register() requires and validates one of these before creating an
+// account — see passengerAuthService.js's register() for why: without
+// this, register() had no way to know an OTP was ever checked at all.
+export function signRegistrationTicket({ phone }, secret) {
+  return jwt.sign({ phone, purpose: REGISTRATION_TICKET_PURPOSE }, secret, { expiresIn: REGISTRATION_TICKET_EXPIRY });
+}
+
+/** Returns the decoded ticket only if it's valid, unexpired, actually a
+ * registration ticket (not a session token or anything else), and bound
+ * to the exact phone being registered. Null otherwise — never throws. */
+export function verifyRegistrationTicket(ticket, phone, secret) {
+  const decoded = decodeToken(ticket, secret);
+  if (!decoded) return null;
+  if (decoded.purpose !== REGISTRATION_TICKET_PURPOSE) return null;
+  if (decoded.phone !== phone) return null;
+  return decoded;
 }

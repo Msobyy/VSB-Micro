@@ -10,7 +10,13 @@ export function requireAuth(service) {
     const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
     const deviceToken = req.headers["device-token"];
 
-    if (!token || !deviceToken) {
+    // A repeated header arrives as an array, not a string — reject that
+    // explicitly rather than letting a non-string value reach the Mongo
+    // query filter inside verifyToken(). Headers can't carry a JSON
+    // object the way a request body can, so this isn't the same
+    // NoSQL-injection class as the /verify endpoint's body field, but
+    // it's the same principle: only a plain string belongs in that filter.
+    if (!token || typeof deviceToken !== "string" || deviceToken.length === 0) {
       throw ApiError.badRequest("Missing Authorization or device-token header", { code: "MISSING_AUTH" });
     }
 

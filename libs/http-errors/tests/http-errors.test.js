@@ -49,6 +49,24 @@ describe("errorHandler", () => {
     });
     expect(logger.error).toHaveBeenCalled();
   });
+
+  it("masks message and details for a deliberate ApiError.internal() too, not just unexpected exceptions", () => {
+    const logger = mockLogger();
+    const res = mockRes();
+    const handler = errorHandler(logger);
+
+    handler(
+      ApiError.internal("zod schema dump", { code: "EVENT_SCHEMA_VIOLATION", details: { secretInternals: true } }),
+      { path: "/x", method: "GET" },
+      res,
+      () => {},
+    );
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      error: { message: "Internal server error", code: "EVENT_SCHEMA_VIOLATION", details: undefined },
+    });
+  });
 });
 
 describe("notFoundHandler", () => {

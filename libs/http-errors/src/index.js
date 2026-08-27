@@ -43,6 +43,14 @@ export function errorHandler(logger) {
   return (err, req, res, next) => {
     const isApiError = err instanceof ApiError;
     const statusCode = isApiError ? err.statusCode : 500;
+    // A 500 means "the caller shouldn't see internals," full stop — that
+    // applies just as much to a deliberate `ApiError.internal(msg,
+    // {details})` as to a genuinely unexpected exception. The previous
+    // version only masked non-ApiError throws, so any 500-class ApiError
+    // leaked its message/details straight to the client (found via a
+    // real example: a zod validation-issue dump reaching an HTTP
+    // response). Full detail always still goes to the logger below.
+    const exposeDetail = isApiError && statusCode < 500;
 
     if (statusCode >= 500) {
       logger.error({ err, path: req.path, method: req.method }, "unhandled error");
@@ -52,9 +60,9 @@ export function errorHandler(logger) {
 
     res.status(statusCode).json({
       error: {
-        message: isApiError ? err.message : "Internal server error",
+        message: exposeDetail ? err.message : "Internal server error",
         code: isApiError ? err.code : "INTERNAL_ERROR",
-        details: isApiError ? err.details : undefined,
+        details: exposeDetail ? err.details : undefined,
       },
     });
   };
