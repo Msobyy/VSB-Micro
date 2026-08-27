@@ -86,3 +86,10 @@ and most latency-sensitive (the "core domain logic" per
 `vsb-backend/CLAUDE.md`). `vsb-backend` and `vsb-crm-backend` are untouched
 by this pilot — they keep running exactly as they do today until a specific
 domain is deliberately cut over.
+
+When a real cutover does happen (data + traffic, not just standing the new
+service up), see
+`docs/architecture-decision-records/0008-mono-to-micro-cutover-strategy.md`
+for the runbook: a maintenance-window migration (acceptable given current
+user volume) with a rehearsed, idempotent, reconciled data split — not yet
+executed for anything, but the methodology every future cutover follows.
