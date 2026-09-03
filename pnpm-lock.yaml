@@ -230,6 +230,46 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.3.0)(vite@8.2.2(@types/node@26.3.0)(yaml@2.9.0))
 
+  services/passenger-service:
+    dependencies:
+      '@opentelemetry/auto-instrumentations-node':
+        specifier: ^0.79.0
+        version: 0.79.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))
+      '@vsb/config':
+        specifier: workspace:*
+        version: link:../../libs/config
+      '@vsb/event-bus':
+        specifier: workspace:*
+        version: link:../../libs/event-bus
+      '@vsb/event-schemas':
+        specifier: workspace:*
+        version: link:../../libs/event-schemas
+      '@vsb/http-errors':
+        specifier: workspace:*
+        version: link:../../libs/http-errors
+      '@vsb/logger':
+        specifier: workspace:*
+        version: link:../../libs/logger
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      express-rate-limit:
+        specifier: ^8.6.2
+        version: 8.6.2(express@5.2.1)
+      mongoose:
+        specifier: ^9.9.4
+        version: 9.9.4
+    devDependencies:
+      '@vsb/test-utils':
+        specifier: workspace:*
+        version: link:../../libs/test-utils
+      supertest:
+        specifier: ^7.2.2
+        version: 7.2.2
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.3.0)(vite@8.2.2(@types/node@26.3.0)(yaml@2.9.0))
+
   services/promotions-service:
     dependencies:
       '@opentelemetry/auto-instrumentations-node':

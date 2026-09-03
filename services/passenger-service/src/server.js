@@ -1,0 +1,62 @@
+// Entry point. Boot order: Mongo, then the Kafka consumer (the only way
+// a profile gets created — see passengerRegisteredConsumer.js), then
+// HTTP. OTel auto-instrumentation is loaded via NODE_OPTIONS
+// (--require @opentelemetry/auto-instrumentations-node/register), not an
+// in-app import — see docs/architecture-decision-records/0004-otel-preload-not-import.md.
+import mongoose from "mongoose";
+import { createLogger } from "@vsb/logger";
+import { createKafkaClient, createConsumer, createProducer, runConsumer } from "@vsb/event-bus";
+import { TOPICS } from "@vsb/event-schemas";
+import { config } from "./config/index.js";
+import { createApp } from "./app.js";
+import { passengerRegisteredConsumer } from "./events/consumers/passengerRegisteredConsumer.js";
+
+const logger = createLogger(config.serviceName);
+
+async function main() {
+  const connection = mongoose.createConnection(config.mongoUri, { dbName: config.mongoDbName });
+  await connection.asPromise();
+  logger.info({ db: config.mongoDbName }, "mongo connected");
+
+  const kafka = createKafkaClient({ clientId: config.kafka.clientId, brokers: config.kafka.brokers });
+  const consumer = await createConsumer(kafka, config.kafkaGroupId);
+  // Same producer instance publishes to a <topic>.dlq if the handler
+  // exhausts its retries — see @vsb/event-bus's dlq.js.
+  const dlqProducer = await createProducer(kafka);
+
+  const handler = passengerRegisteredConsumer({ connection, logger });
+  const consumeLoop = runConsumer({
+    consumer,
+    producer: dlqProducer,
+    topics: [TOPICS.AUTH_PASSENGER_REGISTERED],
+    handler,
+    logger,
+    serviceName: config.serviceName,
+  });
+  consumeLoop.catch((err) => {
+    logger.error({ err }, "consumer loop crashed");
+    process.exit(1);
+  });
+
+  const app = createApp({ connection, config, logger });
+  const server = app.listen(config.port, () => {
+    logger.info({ port: config.port }, "passenger-service listening");
+  });
+
+  async function shutdown(signal) {
+    logger.info({ signal }, "shutting down");
+    await consumer.disconnect();
+    await dlqProducer.disconnect();
+    await new Promise((resolve) => server.close(resolve));
+    await connection.close();
+    process.exit(0);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+main().catch((err) => {
+  logger.error({ err }, "passenger-service failed to start");
+  process.exit(1);
+});

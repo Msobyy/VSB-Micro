@@ -48,7 +48,7 @@ Payload:
 | | |
 |---|---|
 | Producer | `auth-service` (`src/services/passengerAuthService.js`) |
-| Consumers | `notification-service` (welcome push) |
+| Consumers | `notification-service` (welcome push), `passenger-service` (creates the profile record — see `services/passenger-service/src/events/consumers/passengerRegisteredConsumer.js`) |
 | Partition key | `passengerId` |
 | Schema | `libs/event-schemas/src/events/passengerRegisteredV1.js` |
 
@@ -67,8 +67,9 @@ Payload:
 
 Carries the full profile snapshot, not just what auth-service itself
 needs — auth-service only persists identity fields (see
-`services/auth-service/CLAUDE.md`); this event is how a future
-passenger-service would build its own profile record.
+`services/auth-service/CLAUDE.md`); this event is how `passenger-service`
+builds its own profile record (its only write path for *creating* a
+profile — there is no `POST /passengers` HTTP endpoint).
 
 ## Manual end-to-end check
 

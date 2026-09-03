@@ -15,4 +15,5 @@ export const config = {
   promotionsServiceUrl: getConfigValue("promotions_service_url", "PROMOTIONS_SERVICE_URL", "http://localhost:3001"),
   analyticsServiceUrl: getConfigValue("analytics_service_url", "ANALYTICS_SERVICE_URL", "http://localhost:3003"),
   authServiceUrl: getConfigValue("auth_service_url", "AUTH_SERVICE_URL", "http://localhost:3004"),
+  passengerServiceUrl: getConfigValue("passenger_service_url", "PASSENGER_SERVICE_URL", "http://localhost:3005"),
 };

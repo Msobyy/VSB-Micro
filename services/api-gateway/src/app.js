@@ -43,6 +43,13 @@ export function createApp({ config, logger }) {
       logger,
     }),
   );
+  app.use(
+    createProxyMiddleware({
+      pathFilter: "/api/v1/passengers/**",
+      target: config.passengerServiceUrl,
+      logger,
+    }),
+  );
 
   app.use((req, res) => res.status(404).json({ error: { message: "No route for this path", code: "NOT_FOUND" } }));
 

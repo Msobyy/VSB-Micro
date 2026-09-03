@@ -32,6 +32,7 @@ describe("api-gateway proxy routing", () => {
       authServiceUrl: "http://127.0.0.1:1", // unused in these tests
       promotionsServiceUrl: fakePromotionsUrl,
       analyticsServiceUrl: "http://127.0.0.1:1", // unused in these tests
+      passengerServiceUrl: fakePromotionsUrl, // reuse the same echo upstream — just proving the route/target wiring
     };
     app = createApp({ config, logger: createLogger("api-gateway-test") });
   });
@@ -51,6 +52,12 @@ describe("api-gateway proxy routing", () => {
     expect(res.status).toBe(200);
     expect(res.body.echoedPath).toBe("/api/v1/promotions/coupons");
     expect(res.body.echoedQuery).toEqual({ code: "TEST10", active: "true" });
+  });
+
+  it("routes /api/v1/passengers/** to passengerServiceUrl", async () => {
+    const res = await request(app).get("/api/v1/passengers/me");
+    expect(res.status).toBe(200);
+    expect(res.body.echoedPath).toBe("/api/v1/passengers/me");
   });
 
   it("returns 404 for a path with no matching service", async () => {

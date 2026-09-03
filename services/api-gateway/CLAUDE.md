@@ -6,9 +6,9 @@ Guidance for working in this service specifically. See the repo root
 ## What this is
 
 `api-gateway` is the single entry point for the system so far — routes
-REST calls to `promotions-service`, `analytics-service`, and
-`auth-service`, and is where auth verification happens at the edge
-(`src/middlewares/authMiddleware.js`).
+REST calls to `promotions-service`, `analytics-service`, `auth-service`,
+and `passenger-service`, and is where auth verification happens at the
+edge (`src/middlewares/authMiddleware.js`).
 
 ## Commands
 

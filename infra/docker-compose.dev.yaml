@@ -87,6 +87,7 @@ services:
       PROMOTIONS_SERVICE_URL: http://promotions-service:3001
       ANALYTICS_SERVICE_URL: http://analytics-service:3003
       AUTH_SERVICE_URL: http://auth-service:3004
+      PASSENGER_SERVICE_URL: http://passenger-service:3005
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_SERVICE_NAME: api-gateway
@@ -97,6 +98,7 @@ services:
       - promotions-service
       - analytics-service
       - auth-service
+      - passenger-service
       - jaeger
     networks: [vsb-net]
 
@@ -194,5 +196,30 @@ services:
       redpanda:
         condition: service_healthy
       jaeger:
+        condition: service_started
+    networks: [vsb-net]
+
+  passenger-service:
+    build:
+      context: ..
+      dockerfile: services/passenger-service/Dockerfile
+    container_name: vsb-passenger-service
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      MONGO_URI: ${MONGO_URI}
+      KAFKA_BROKERS: redpanda:9092
+      AUTH_SERVICE_URL: http://auth-service:3004
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: passenger-service
+      NODE_OPTIONS: --require @opentelemetry/auto-instrumentations-node/register
+    ports:
+      - "3005:3005"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+      auth-service:
         condition: service_started
     networks: [vsb-net]

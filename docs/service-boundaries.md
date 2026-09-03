@@ -2,9 +2,10 @@
 
 Target reference architecture for the eventual full migration. Only
 `api-gateway`, `promotions-service`, `notification-service`,
-`analytics-service`, and `auth-service` (passenger auth only) are
-actually built so far; everything else below is the target map this
-build-out is meant to prove out, not yet-built code.
+`analytics-service`, `auth-service` (passenger auth only), and
+`passenger-service` (profile only) are actually built so far; everything
+else below is the target map this build-out is meant to prove out, not
+yet-built code.
 
 Derived from `vsb-backend`'s and `vsb-crm-backend`'s existing `models/`,
 `controllers/`, `services/`, and `routes/` directories.
@@ -16,8 +17,8 @@ Derived from `vsb-backend`'s and `vsb-crm-backend`'s existing `models/`,
 | `notification-service` | FCM push (`fcmBatchHelper`), WhatsApp/SMS delivery | Built (coupon-redeemed + passenger-registered pushes) |
 | `analytics-service` | CQRS read-model: driver performance, audit logs, telemetry, demand aggregation | Built (pilot, coupon redemptions only) |
 | `auth-service` | 3 JWT domains (passenger/driver/CRM), OTP, RBAC/permissions | Built (**passenger only** — driver and CRM/admin auth are structurally different and not yet built, see that service's CLAUDE.md) |
+| `passenger-service` | `passengerModel` profile fields (firstName/lastName/gender/city/email) | Built (profile only — no ride stats, no coupon ledger, see that service's CLAUDE.md) |
 | `driver-service` | `driverModel`, `vehicleModel`, shift lifecycle, document/selfie uploads (S3/Rekognition) | Not built |
-| `passenger-service` | `passengerModel` and passenger profile concerns | Not built |
 | `location-service` | Redis geo, `nearbyDriversV2/*`, h3-js bucketing, demand heatmap, surge forecast | Not built |
 | `dispatch-service` | Matching engine: wave dispatch, ride offer fanout/accept races | Not built — highest risk |
 | `ride-service` | Ride aggregate + lifecycle history, SOS | Not built |
@@ -33,9 +34,12 @@ Derived from `vsb-backend`'s and `vsb-crm-backend`'s existing `models/`,
 - **Kafka (async, default)** — domain facts (`ride.completed`,
   `payment.captured`, `bonus.awarded`, ...). Anything that only *reacts* to
   something should consume, not call synchronously.
-- **REST (sync, when the caller needs an immediate answer)** — e.g. a future
-  `realtime-gateway` → `dispatch-service` call for an offer-accept that
-  needs a sub-second ack back to a socket.
+- **REST (sync, when the caller needs an immediate answer)** — first real
+  example: `passenger-service` calls `auth-service`'s `/verify` to
+  authenticate a caller (plain `fetch`, no client library — see
+  `passenger-service/src/middlewares/requireAuth.js`). A future
+  `realtime-gateway` → `dispatch-service` call for an offer-accept
+  needing a sub-second ack back to a socket would follow the same shape.
 - **gRPC — not adopted.** Business logic lives in plain service-layer
   functions (not embedded in Express handlers), so a gRPC transport could be
   added later on a specific hot path without a rewrite, if REST proves to be

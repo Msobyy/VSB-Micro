@@ -31,6 +31,10 @@ export class ApiError extends Error {
   static internal(message, opts) {
     return new ApiError(500, message, opts);
   }
+
+  static serviceUnavailable(message, opts) {
+    return new ApiError(503, message, opts);
+  }
 }
 
 /**
