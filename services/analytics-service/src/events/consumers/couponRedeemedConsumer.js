@@ -18,16 +18,14 @@ export function couponRedeemedConsumer({ connection, logger }) {
       return;
     }
 
-    const { skipped } = await withIdempotency(connection, envelope.eventId, async () => {
+    const { skipped } = await withIdempotency(connection, envelope.eventId, async (session) => {
       const { couponCode, driverId, amount, currency, redeemedAt } = parsed.data.payload;
-      await Redemption.create({
-        eventId: envelope.eventId,
-        couponCode,
-        driverId,
-        amount,
-        currency,
-        redeemedAt: new Date(redeemedAt),
-      });
+      // Same transaction as withIdempotency's own processed-event marker
+      // (session comes from there) — see that file's header comment.
+      await Redemption.create(
+        [{ eventId: envelope.eventId, couponCode, driverId, amount, currency, redeemedAt: new Date(redeemedAt) }],
+        { session },
+      );
     });
 
     if (skipped) {

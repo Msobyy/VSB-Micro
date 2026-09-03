@@ -18,11 +18,14 @@ export function passengerRegisteredConsumer({ connection, logger }) {
       return;
     }
 
-    const { skipped } = await withIdempotency(connection, envelope.eventId, async () => {
+    const { skipped } = await withIdempotency(connection, envelope.eventId, async (session) => {
       const { passengerId, firstName, lastName, gender, email, city } = parsed.data.payload;
       // Same _id auth-service minted at registration — the correlation
-      // key across both services, never regenerated here.
-      await PassengerProfile.create({ _id: passengerId, firstName, lastName, gender, email, city });
+      // key across both services, never regenerated here. Written in the
+      // same transaction as withIdempotency's own processed-event marker
+      // (session comes from there) so a failed create() here is never
+      // mistaken for "already handled" on the next delivery attempt.
+      await PassengerProfile.create([{ _id: passengerId, firstName, lastName, gender, email, city }], { session });
     });
 
     if (skipped) {

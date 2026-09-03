@@ -23,9 +23,13 @@ export async function sendToDlq({ producer, topic, message, reason, error, attem
     failedAt: new Date().toISOString(),
   };
 
+  // acks: -1 ("all") — a DLQ write that gets lost is a poison message
+  // vanishing with no record anywhere, which is worse than the crash-loop
+  // this whole mechanism exists to avoid.
   await producer.send({
     topic: dlqTopic,
     messages: [{ key: message.key, value: JSON.stringify(dlqEnvelope) }],
+    acks: -1,
   });
 
   logger.error({ dlqTopic, reason, attempts, eventId: dlqEnvelope.originalKey }, "message sent to DLQ after exhausting retries");

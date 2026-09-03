@@ -51,7 +51,12 @@ export async function publishWithTracing({ producer, topic, key, value, traceCon
         try {
           const headers = {};
           propagation.inject(context.active(), headers);
-          await producer.send({ topic, messages: [{ key, value, headers }] });
+          // acks: -1 ("all") is kafkajs's default already, but set
+          // explicitly — this is the outbox relay's publish path, and an
+          // event silently accepted by only the leader (acks: 1) before a
+          // leader failover would be lost with no retry, defeating the
+          // whole point of the outbox pattern.
+          await producer.send({ topic, messages: [{ key, value, headers }], acks: -1 });
         } catch (err) {
           span.recordException(err);
           span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
